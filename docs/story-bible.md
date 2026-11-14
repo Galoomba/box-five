@@ -26,6 +26,8 @@ A masked ball at the Paris Opera, Mardi Gras night, Tuesday 21 February 1882. So
 
 - **Party date unknown:** no print deadline yet. Print about 3 days before; after that, printed text can't change.
 - Language variety: US English, the same as Forget-Me-Not (not asked separately).
+- **Voice-over unfinished:** the ElevenLabs credits ran out after 12 of 137 clips (2026-11-14). The user chose to wait for the monthly reset, then run `npm run voice`, which records only what's missing. Until then the browser voice reads the missing lines.
+- Portraits: generated with Picsart (20 credits, user's yes, 2026-11-14).
 - The killer is a guest, never the host. Victor knows the whole solution; he plays a red herring and doesn't vote.
 
 ## Theme facts

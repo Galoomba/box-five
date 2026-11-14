@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0608">
+<title>Box Five · Your cards</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,700;1,700&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0d0608; --panel: #22090e; --ink: #f3e7d3; --dim: #bfae97; --gold: #e0bd6a; --red: #d0213f; --line: rgba(224,189,106,0.38); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 19px/1.55 'Libre Baskerville', Georgia, serif; -webkit-text-size-adjust: 100%; }
+  main { max-width: 560px; margin: 0 auto; padding: 18px 16px 60px; }
+  h1 { font-size: 28px; color: var(--gold); margin: 6px 0 2px; font: italic 700 28px 'Bodoni Moda', Georgia, serif; letter-spacing: 0.02em; }
+  h2 { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin: 24px 0 8px; font-weight: normal; }
+  p { margin: 8px 0; }
+  .dim { color: var(--dim); }
+  .kicker { font-size: 13px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--dim); }
+  input { width: 100%; font: inherit; font-size: 22px; padding: 14px; border-radius: 3px; border: 1px solid var(--line); background: #1a080c; color: var(--ink); }
+  button { font: inherit; font-size: 20px; padding: 14px 18px; border-radius: 3px; border: 1px solid var(--gold); background: linear-gradient(#5c0716, #2a050c); color: var(--gold); width: 100%; margin-top: 12px; }
+  .who { display: grid; grid-template-columns: 110px 1fr; gap: 14px; align-items: center; margin-top: 8px; }
+  .who img { width: 110px; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 18px 0 4px; }
+  .tabs button { margin: 0; font-size: 17px; padding: 10px; border-color: var(--line); color: var(--dim); background: transparent; }
+  .tabs button.on { border-color: var(--gold); color: var(--gold); background: linear-gradient(#5c0716, #2a050c); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px; margin: 14px 0; }
+  .card.new { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(224,189,106,0.38); animation: glow 1.4s ease 3; }
+  @keyframes glow { 50% { box-shadow: 0 0 22px rgba(224,189,106,0.7); } }
+  .card .head { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 8px; }
+  .story { font-size: 21px; font-weight: bold; margin: 10px 0; }
+  .box { border: 1px solid var(--ink); border-radius: 8px; padding: 10px 12px; margin: 10px 0; }
+  .box b { display: block; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 2px; }
+  .orders { border: 2px solid var(--red); background: rgba(192,57,77,0.12); }
+  .orders b { color: #ff8a9a; }
+  .talk { border-left: 3px solid var(--gold); padding: 4px 0 4px 12px; margin: 10px 0; }
+  .talk b, .whisper b { display: block; font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold); }
+  .whisper { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 8px; font-style: italic; }
+  .whisper b { font-style: normal; }
+  .line { font-size: 22px; color: var(--gold); }
+  .status { position: sticky; top: 0; background: var(--bg); padding: 8px 0; font-size: 14px; color: var(--dim); border-bottom: 1px solid #241619; z-index: 2; }
+  .status .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #5fd38a; margin-right: 6px; }
+  .status .dot.off { background: var(--red); }
+  .center { text-align: center; }
+  .error { color: #ff8a9a; }
+  .private { font-size: 14px; color: var(--dim); text-align: center; margin-top: 18px; }
+</style>
+</head>
+<body>
+<main id="app"><p class="dim">Loading…</p></main>
+<script>
+(function () {
+  /* A guest's phone: join with a name, wait for the host to give a character, then read only that
+     character's cards, one scene at a time. The server never sends anyone else's cards. */
+  const KEY = 'box-five-phone-v1';
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(location.search);
+  const joinCode = params.get('j') || '';
+  let token = null;
+  try { token = localStorage.getItem(KEY); } catch (e) { /* private mode: join again on reload */ }
+  let tab = 'cards';
+  let seenCards = null;
+  let lastView = null;
+  let online = true;
+
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else if (v != null && v !== false) n.setAttribute(k, v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+    return n;
+  }
+  function show(...nodes) { app.replaceChildren(...nodes.filter(Boolean)); }
+
+  function joinScreen(err) {
+    const input = el('input', { type: 'text', maxlength: 30, placeholder: 'Your first name', autocomplete: 'given-name' });
+    const go = async () => {
+      if (!joinCode) return joinScreen('This link has no code. Scan the code on the TV again.');
+      try {
+        const r = await fetch(`/play/join?j=${encodeURIComponent(joinCode)}`, { method: 'POST', body: JSON.stringify({ name: input.value }) });
+        const b = await r.json();
+        if (!r.ok) return joinScreen(b.error || 'Something went wrong.');
+        token = b.token;
+        try { localStorage.setItem(KEY, token); } catch (e) { /* keep it in memory */ }
+        tick();
+      } catch (e) { joinScreen('Cannot reach the game. Are you on the same Wi-Fi?'); }
+    };
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+    show(el('div', { class: 'kicker' }, 'Box Five'), el('h1', {}, 'Welcome'),
+      el('p', {}, 'Type your first name. The hosts will give you a character. Your cards will appear here, one stage at a time.'),
+      input, el('button', { onclick: go }, 'Join the game'), err ? el('p', { class: 'error' }, err) : null);
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function waitingScreen(name) {
+    show(el('div', { class: 'kicker' }, 'Box Five'), el('h1', {}, `Hello, ${name}`),
+      el('p', {}, 'You are in. Now wait: the hosts will give you a character.'),
+      el('p', { class: 'dim' }, 'Keep this page open. It changes by itself.'));
+  }
+
+  function cardNode(card, fresh) {
+    return el('div', { class: 'card' + (fresh ? ' new' : '') },
+      el('div', { class: 'head' }, el('span', {}, card.label), el('span', {}, card.title)),
+      card.word ? el('div', { class: 'box' }, el('b', {}, `Your team word, number ${card.word.index}`), el('span', { class: 'line' }, card.word.text)) : null,
+      card.story ? null : el('p', {}, card.text),
+      card.story ? el('div', {}, el('p', { class: 'dim' }, 'Read aloud, exactly:'), el('p', { class: 'story' }, `“${card.story}”`)) : null,
+      card.strip ? el('div', { class: 'box' }, el('b', {}, `Torn strip ${card.strip.number}`), card.strip.text) : null,
+      card.witness ? el('div', { class: 'box' }, el('b', {}, 'Your witness card: read it aloud when your team opens its envelope'), card.witness) : null,
+      card.question ? el('div', { class: 'box' }, el('b', {}, 'Your question'), card.question) : null,
+      ...(card.orders || []).map((o) => el('div', { class: 'box orders' }, el('b', {}, 'Secret orders: only for you'), o)),
+      card.talk ? el('div', { class: 'talk' }, el('b', {}, 'Table talk'), card.talk) : null,
+      card.whisper ? el('div', { class: 'whisper' }, el('b', {}, 'A whisper'), card.whisper) : null);
+  }
+
+  function characterScreen(me) {
+    const v = me.view;
+    const title = v.name || `${v.numberLabel} ${v.number}`;
+    const head = el('div', { class: 'who' }, el('img', { src: v.image, alt: '' }),
+      el('div', {}, el('div', { class: 'kicker' }, `${v.numberLabel} ${v.number}`), el('h1', {}, title),
+        v.name ? null : el('p', { class: 'dim' }, 'Your name? You will find it soon.'),
+        el('p', { class: 'dim' }, `Wear: ${v.costume.toLowerCase()}`)));
+    const tabs = el('div', { class: 'tabs' },
+      el('button', { class: tab === 'cards' ? 'on' : '', onclick: () => { tab = 'cards'; render(me); } }, `Your cards (${v.cards.length})`),
+      el('button', { class: tab === 'you' ? 'on' : '', onclick: () => { tab = 'you'; render(me); } }, 'Who you are'));
+    let body;
+    if (tab === 'you') {
+      body = [el('h2', {}, 'Who you are'), el('p', {}, v.intro.text),
+        el('h2', {}, 'How to act'), el('p', {}, v.intro.act),
+        el('h2', {}, 'Your habit, all night'), el('p', {}, v.intro.quirk),
+        el('h2', {}, 'Your public line'), el('p', { class: 'line' }, `“${v.intro.publicLine}”`),
+        el('h2', {}, 'How the night works'),
+        ...v.rules.map((r) => el('p', {}, r))];
+    } else if (!v.cards.length) {
+      body = [el('div', { class: 'card' }, el('p', { class: 'center' }, v.started ? 'Your next card comes when the hosts say "cards out".' : 'The night has not started yet. Read "Who you are" while you wait.'))];
+    } else {
+      const fresh = seenCards != null && v.cards.length > seenCards;
+      body = v.cards.slice().reverse().map((c, i) => cardNode(c, fresh && i === 0));
+      /* What the team found in its picture envelopes, newest first, above the cards. */
+      (v.found || []).slice().reverse().forEach((f) => body.unshift(el('div', { class: 'card new' },
+        el('div', { class: 'head' }, el('span', {}, `Your team found · ${f.picture}`), el('span', {}, f.title)),
+        el('p', {}, f.text))));
+      if (!v.over) body.push(el('p', { class: 'dim center' }, 'Your next card comes at the next stage.'));
+    }
+    show(el('div', { class: 'status' }, el('span', { class: 'dot' + (online ? '' : ' off') }), online ? (v.started ? v.stage : 'Waiting for the night to begin') : 'Lost the game. Are you on the Wi-Fi?'),
+      head, tabs, ...body, el('p', { class: 'private' }, 'Only you see this. Do not show it to anyone.'));
+  }
+
+  function render(me) {
+    if (!me.assigned) return waitingScreen(me.name);
+    characterScreen(me);
+  }
+
+  async function tick() {
+    if (!token) return;
+    try {
+      const r = await fetch(`/play/me?t=${encodeURIComponent(token)}`, { cache: 'no-store' });
+      if (r.status === 404) { token = null; try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ } return joinScreen('The hosts started a new night. Please join again.'); }
+      const me = await r.json();
+      online = true;
+      const json = JSON.stringify(me);
+      if (json === lastView) return;
+      const before = lastView ? JSON.parse(lastView) : null;
+      const count = me.view ? me.view.cards.length : 0;
+      const prev = before && before.view ? before.view.cards.length : null;
+      if (prev != null && count > prev) { tab = 'cards'; if (navigator.vibrate) navigator.vibrate([200, 100, 200]); }
+      seenCards = prev;
+      lastView = json;
+      render(me);
+    } catch (e) {
+      if (online) { online = false; if (lastView) render(JSON.parse(lastView)); }
+    }
+  }
+
+  if (token) tick(); else joinScreen();
+  setInterval(tick, 2000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+})();
+</script>
+</body>
+</html>
